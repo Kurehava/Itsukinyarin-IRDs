@@ -1,4 +1,4 @@
-clear;liveflags=0;secflags=0;clfeflags=0;
+ clear;liveflags=0;secflags=0;clfeflags=0;
 biliroot="/home/nyarin/recordserver/BiliRecorder/"
 ddtvroot="/home/nyarin/recordserver/DDTV2/tmp"
 recordroot="/media/nyarin/Record-DISK/RecordFiles"
@@ -101,37 +101,39 @@ function occupychk(){
     mkdir -p $savepath
     #DDTV
     cd "$ddtvroot/bilibili_$unames'_'$list/"
-    
     for chklist in *.flv;do
         if [ "$chklist" = "*.flv" ];then
             printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : 没有检测到FLV录制视频文件\n"
         else
             while :;do
-                if [ "`lsof $chklist | grep -v "PID" | awk '{print $2}'`" != "" ];then
+                if [ "`lsof $chklist | grep -v "PID" | awk '{print $2}'`" != "" ] && [ "$sleepplus" \<\= "2" ];then
                     printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
                     sleep 10m
                     let sleepplus++
-                    if [ "$sleepplus" \>\= "2" ];then
-                    printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : $chklist 持续被占用，本次将跳过此文件的移动。"
-                        break
-                    fi
+                elif [ "$sleepplus" \> "2" ];then
+                    printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n"
+                    ddtvwaitlist+=("$ddtvroot/bilibili_$unames'_'$list/$chklist")
+                    break
                 else
-                    ProgressBar 
-                    mv "$chklist" "$savepath"
+                    printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件"$chklist"\n"
+                    metasize="`ls -l $ddtvroot/bilibili_$unames'_'$list/*.flv | awk '{print $5}' 2>/dev/null`"
+                    mv "$chklist" "$savepath"&
+                    ProgressBar "$ddtvroot/bilibili_$unames'_'$list/$chklist" "$savepath" "$chklist" "$matasize"
                     break
                 fi
             done
         fi
     done
-    unset sleepplus
+    unset sleepplus;unset chklist
+
     #BilibiliRecord
     cd $biliroot
-    for list in `ls -d */`;do
+    for listfld in `ls -d */`;do
         if [ ${list:0:4} = $(date "+%Y") ];then
-            cd $list;unset chklist;
+            cd $listfld;unset chklist;
             for chklist in *.flv;do
                 while :;do
-                    if [ "`lsof $chklist | grep -v "PID" | awk '{print $2}'`" != "" ] && [ "$sleepplus" \<\= "2"  ];then
+                    if [ "`lsof $chklist 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ] && [ "$sleepplus" \<\= "2"  ];then
                         printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
                         sleep 10m
                         let sleepplus++
@@ -140,17 +142,25 @@ function occupychk(){
                         biliwaitlist+=("$biliroot$list$chklist")
                         break
                     else
-                        printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件"$list"\n"
-                        metasize="`du --max-depth=1 "$biliroot$list" | awk '{print $1}' 2>/dev/null`"
-                        mv "$biliroot$list" "$savepath"&
-                        ProgressBar "$biliroot$list" "$savepath" "$chklist" "$matasize"
+                        printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件"$listfld"\n"
+                        metasize="`du --max-depth=1 "$biliroot$listfld" | awk '{print $1}' 2>/dev/null`"
+                        mv "$biliroot$listfld" "$savepath"&
+                        ProgressBar "$biliroot$listfld" "$savepath" "$chklist" "$matasize"
                         break
                     fi
                 done
             done
         fi
     done
-    unset sleepplus
+    unset sleepplus;unset chklist
+
+    #等待文件池
+    for dwf in ${ddtvwaitlist[@]};do
+        if [ "`lsof $dwf 2>/dev/null | grep -v "PID" | awk '{print $2}'`" = "" ];then
+            printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件池文件"$dwf"\n"
+            metasize="`ls -l "$dwf" | awk '{print $5}' 2>/dev/null`"
+            mv "$dwf" "$savepath"&
+            ProgressBar "$dwf" "$savepath" "$chklist" "$matasize"
 }
 ##main##
 #echo "\e[0;90;32m[info]\e[0;0;96m : "${uname[$allcount]}"已开播"
