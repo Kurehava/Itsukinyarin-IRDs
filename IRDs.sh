@@ -156,13 +156,38 @@ function occupychk(){
 
     #等待文件池
     for dwf in ${ddtvwaitlist[@]};do
-        if [ "`lsof $dwf 2>/dev/null | grep -v "PID" | awk '{print $2}'`" = "" ];then
+        PID=`lsof $dwf 2>/dev/null | grep -v "PID" | awk '{print $2}'`
+        if [ "$PID" = "" ];then
             printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件池文件"$dwf"\n"
             metasize="`ls -l "$dwf" | awk '{print $5}' 2>/dev/null`"
             mv "$dwf" "$savepath"&
             ProgressBar "$dwf" "$savepath" "$chklist" "$matasize"
+            ddtvwaitlist=(${ddtvwaitlist[@]/$dwf})
+        else
+            PIDw=`echo $PID | sed 's:^[[:digit:]]:[&]:g'`
+            PROCESS_NAME=`ps -ef | grep -w $PIDw | awk '{print $8,$9,$10}'`
+            `echo -e "【Warning】\n出现长时间文件被占用的情况，请求人工介入：\n被占用文件路径 : $dwf\n占用程序PID   : $PID\n占用程序名称   : $PROCESS_NAME" | mail -s "Warning::文件占用警报" orikiringi@gmail.com`
+            printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : "$dwf"出现长时间文件占用现象，已邮件通知管理者。\n"
+        fi
+    done
+    for bwf in ${biliwaitlist[@]};do
+        cd $bwf
+        totalflv=`ls -l *.flv | grep "^-" | wc -l`
+        for bwfn in *.flv;do
+            PID=`lsof $bwfn 2>/dev/null | grep -v "PID" | awk '{print $2}'`
+            if [ "$PID" = "" ];then
+                let totalflv--
+            fi
+        done
+        if [ "$totalflv" = "0" ];then
+            metasize=`du --max-depth=1 $bwf | awk '{print $1}' 2>/dev/null`
+            
+    done
+
 }
 ##main##
+#echo "This is the mail body" | mail -s "1234" orikiringi@gmail.com
+#echo -e "This is the mail body\n1234\n1234\n12321321\nqeqw" | mail -s "1234" orikiringi@gmail.com
 #echo "\e[0;90;32m[info]\e[0;0;96m : "${uname[$allcount]}"已开播"
 #echo "\e[0;90;32m[info]\e[0;0;96m : \""${titlelist[$allcount]}"\""
 header
