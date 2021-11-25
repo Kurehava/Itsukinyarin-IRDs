@@ -1,4 +1,4 @@
- clear;liveflags=0;secflags=0;clfeflags=0;
+clear;liveflags=0;secflags=0;clfeflags=0;
 biliroot="/home/nyarin/recordserver/BiliRecorder/"
 ddtvroot="/home/nyarin/recordserver/DDTV2/tmp"
 recordroot="/media/nyarin/Record-DISK/RecordFiles"
@@ -22,10 +22,16 @@ function ProgressBar(){
     metasize="$4"
     #cp -r $dir$filename $tar 2>/dev/null&
     if [ "`ps -ef | grep -w '[c]p'| awk '{print $2}'`" != "" ];then
-        while [ $i -ne 100 ]
-        do
-            #metasize="`du --max-depth=1 $dir$filename | awk '{print $1}' 2>/dev/null`"
-            targsize="`du --max-depth=1 $tar$filename | awk '{print $1}' 2>/dev/null`"
+        while [ $i -ne 100 ];do
+            if [ -d $tar$filename ];then
+                #metasize="`du --max-depth=1 $dir$filename | awk '{print $1}' 2>/dev/null`"
+                targsize="`du --max-depth=1 $tar$filename | awk '{print $1}' 2>/dev/null`"
+            elif [ -f $tar$filename ];then
+                targsize="`ls -l $tar$filename | awk '{print $5}'`"
+            else
+                printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;31m[erro]\e[0;0;96m : 目标文件不为文件夹也不为文件，很奇怪，我无法开启进度条显示。\n"
+                break 2
+            fi
             let statsize=$targsize*100/$metasize
             let chkdatas=$i+5
             let index=i%4
@@ -160,8 +166,9 @@ function occupychk(){
         if [ "$PID" = "" ];then
             printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : 正在移动文件池文件"$dwf"\n"
             metasize="`ls -l "$dwf" | awk '{print $5}' 2>/dev/null`"
+            fn=`echo $dwf | sed 's:/: :g' | awk '{print $NF}'`
             mv "$dwf" "$savepath"&
-            ProgressBar "$dwf" "$savepath" "$chklist" "$matasize"
+            ProgressBar "$dwf" "$savepath" "$fn" "$matasize"
             ddtvwaitlist=(${ddtvwaitlist[@]/$dwf})
         else
             PIDw=`echo $PID | sed 's:^[[:digit:]]:[&]:g'`
@@ -181,9 +188,16 @@ function occupychk(){
         done
         if [ "$totalflv" = "0" ];then
             metasize=`du --max-depth=1 $bwf | awk '{print $1}' 2>/dev/null`
-            
+            fn=`echo $bwf | sed 's:/: :g' | awk '{print $NF}'`
+            mv "$bwf" "$savepath"&
+            ProgressBar "$bwf" "$savepath" "$fn" "$metasize"
+        else
+            PIDw=`echo $PID | sed 's:^[[:digit:]]:[&]:g'`
+            PROCESS_NAME=`ps -ef | grep -w $PIDw | awk '{print $8,$9,$10}'`
+            `echo -e "【Warning】\n出现长时间文件被占用的情况，请求人工介入：\n被占用文件路径 : $bwf\n占用程序PID   : $PID\n占用程序名称   : $PROCESS_NAME" | mail -s "Warning::文件占用警报" orikiringi@gmail.com`
+            printf "\e[1;40;32m[info]\e[0;0;96m : >>>>>\n\e[1;40;32m[info]\e[0;0;96m : "$bwf"出现长时间文件占用现象，已邮件通知管理者。\n"
+        fi
     done
-
 }
 ##main##
 #echo "This is the mail body" | mail -s "1234" orikiringi@gmail.com
