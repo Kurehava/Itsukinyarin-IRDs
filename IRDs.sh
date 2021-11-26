@@ -173,7 +173,7 @@ function occupychk(){
                     else
                         NameConvert "$BILI_DIR$BILI_FOLDER" "$BILI_FLV" "1"
                         BILI_FLV="$FLVw"
-                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FLV".\n\n"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FLV".\n"
                         metasize="`du --max-depth=1 "$BILI_DIR$BILI_FOLDER" | awk '{print $1}' 2>/dev/null`"
                         mv "$BILI_DIR$BILI_FOLDER" "$savepath"&
                         ProgressBar "$savepath" "$BILI_FOLDER" "$metasize"
