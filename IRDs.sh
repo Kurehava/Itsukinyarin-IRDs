@@ -4,8 +4,8 @@ clear;liveflags=0;secflags=0;clfeflags=0;
 #RECORD_DIR="/media/nyarin/Record-DISK/RecordFiles"
 BILI_DIR="/home/oriki/recordserver/BiliRecorder/"
 DDTV_DIR="/home/oriki/recordserver/DDTV2/tmp"
-#RECORD_DIR="/media/oriki/GravityWall"
-RECORD_DIR="/home/oriki/wqe"
+RECORD_DIR="/media/oriki/GravityWall"
+#RECORD_DIR="/home/oriki/wqe"
 function header(){
     #从第5行到屏幕底端的范围滚动显示
     echo -ne "\e[5r"
@@ -14,6 +14,14 @@ function header(){
     echo -ne "Powered by oriki ver.0.9.2                >\n"
     echo -ne "===========================================\e[96m\n"
     echo -ne "\e[5H"
+}
+
+function NameConvert(){
+    cd "$1"
+    FLVw=`echo "$2" | sed 's:\\\::g' | tr -d " ><*+/'#$\""`
+    if [ $3 = 1 ];then
+        mv "$2" "$FLVw"
+    fi
 }
 
 function ProgressBar(){
@@ -115,10 +123,9 @@ function occupychk(){
         mkdir -p $savepath
     
         #DDTV
-        cd "$DDTV_DIR/bilibili_$unames"_"$list/"
+        DDTV_DL_DIR="$DDTV_DIR/bilibili_$unames"_"$list/";cd $DDTV_DL_DIR
+        DDTV_DL_DIR_LEN=${#DDTV_DL_DIR}
         for DDTV_FLV in *.flv;do
-            #DDTV_FLV="`echo $DDTV_FLV | sed 's:\*:\\\*:g'`"
-            DDTV_FLV="./$DDTV_FLV"
             if [ "$DDTV_FLV" = "*.flv" ];then
                 printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : DDTV目录没有检测到FLV录制视频文件\n"
             else
@@ -132,8 +139,9 @@ function occupychk(){
                         ddtvwaitlist+=("$DDTV_DIR/bilibili_$unames"_"$list/$DDTV_FLV")
                         break
                     else
-                        DDTV_FLV_VIS="`echo $DDTV_FLV | sed 's/ /[:space:]/g'`"
-                        printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV-正在移动文件"$DDTV_FLV_VIS".\n"
+                        NameConvert "$DDTV_DL_DIR" "$DDTV_FLV" "1"
+                        DDTV_FLV="$FLVw"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV-正在移动文件"$DDTV_FLV".\n"
                         metasize="`ls -l "$DDTV_FLV" | awk '{print $5}' 2>/dev/null`"
                         mv "$DDTV_FLV" "$savepath"&
                         ProgressBar "$savepath" "$DDTV_FLV" "$metasize"
@@ -148,10 +156,11 @@ function occupychk(){
         cd "$BILI_DIR"
         flag2bili=0
         for BILI_FOLDER in `ls -d */ | grep "^$(date "+%Y")"`;do
+            NameConvert "$BILI_DIR" "$BILI_FOLDER" "1"
+            BILI_FOLDER="$FLVw"
             cd "$BILI_DIR$BILI_FOLDER"
             flag2bili=1
             for BILI_FLV in *.flv;do
-                #BILI_FLV="`echo $BILI_FLV | sed 's:\*:\\\*:g'`"
                 while :;do
                     if [ "`lsof "$BILI_FLV" 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ] && [ "$SLEEPWAIT" \<\= "2"  ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
@@ -162,8 +171,9 @@ function occupychk(){
                         biliwaitlist+=("$BILI_DIR$BILI_FOLDER")
                         break
                     else
-                        BILI_FOLDER_VIS="`echo $BILI_FOLDER | sed 's/ /[:space:]/g'`"
-                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FOLDER_VIS".\n\n"
+                        NameConvert "$BILI_DIR$BILI_FOLDER" "$BILI_FLV" "1"
+                        BILI_FLV="$FLVw"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FLV".\n\n"
                         metasize="`du --max-depth=1 "$BILI_DIR$BILI_FOLDER" | awk '{print $1}' 2>/dev/null`"
                         mv "$BILI_DIR$BILI_FOLDER" "$savepath"&
                         ProgressBar "$savepath" "$BILI_FOLDER" "$metasize"
@@ -182,11 +192,14 @@ function occupychk(){
             for dwf in ${ddtvwaitlist[@]};do
                 PID=`lsof "$dwf" 2>/dev/null | grep -v "PID" | awk '{print $2}'`
                 if [ "$PID" = "" ];then
-                    dwf_VIS="`echo ${dwf:57} | sed 's/ /[:space:]/g'`"
-                    printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV池-正在移动文件池文件"$dwf_VIS"\n"
-                    metasize="`ls -l "$dwf" | awk '{print $5}' 2>/dev/null`"
-                    mv "$dwf" "$savepath"&
-                    ProgressBar "$savepath" "${dwf:57}" "$metasize"
+                    dwf_DIR=${dwf:0:$DDTV_DL_DIR_LEN}
+                    dwf_FILENAME=${dwf:$DDTV_DL_DIR_LEN}
+                    NameConvert "$dwf_DIR" "$dwf_FILENAME" "1"
+                    dwf_FILENAME="$FLVw"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV池-正在移动文件池文件"$dwf_FILENAME"\n"
+                    metasize="`ls -l "$dwf_FILENAME" | awk '{print $5}' 2>/dev/null`"
+                    mv "$dwf_FILENAME" "$savepath"&
+                    ProgressBar "$savepath" "$dwf_FILENAME" "$metasize"
                     ddtvwaitlist=(${ddtvwaitlist[@]/$dwf})
                 else
                     PIDw=`echo $PID | sed 's:^[[:digit:]]:[&]:g'`
@@ -196,7 +209,7 @@ function occupychk(){
                 fi
             done
         fi
-        unset dwf PID metasize ddtvwaitlist PIDw PROCESS_NAME
+        unset dwf PID metasize ddtvwaitlist PIDw PROCESS_NAME dwf_DIR dwf_FILENAME
 
         #BILI等待文件池
         if [ "${#biliwaitlist[*]}" \> "1" ];then
@@ -210,11 +223,15 @@ function occupychk(){
                     fi
                 done
                 if [ "$totalflv" = "0" ];then
-                    bwf_VIS="`echo ${bwf:38} | sed 's/ /[:space:]/g'`"
-                    printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI池-正在移动文件池文件"$bwf_VIS"\n"
+                    bwf_DIR=${dwf:0:38}
+                    bwf_FILENAME=${dwf:38}
+                    NameConvert "$bwf_DIR" "$bwf_FILENAME" "1"
+                    bwf_FILENAME="$FLVw"
+                    bwf="$bwf_DIR$bwf_FILENAME"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI池-正在移动文件池文件"$bwf_FILENAME"\n"
                     metasize=`du --max-depth=1 "$bwf" | awk '{print $1}' 2>/dev/null`
                     mv "$bwf" "$savepath"&
-                    ProgressBar "$savepath" "${bwf:38}" "$metasize"
+                    ProgressBar "$savepath" "$bwf_FILENAME" "$metasize"
                 else
                     PIDw=`echo $PID | sed 's:^[[:digit:]]:[&]:g'`
                     PROCESS_NAME=`ps -ef | grep -w $PIDw | awk '{print $8,$9,$10}'`
@@ -223,7 +240,7 @@ function occupychk(){
                 fi
             done
         fi
-        unset bwf totalflv metasize biliwaitlist PIDw PROCESS_NAME
+        unset bwf totalflv metasize biliwaitlist PIDw PROCESS_NAME bwf_DIR bwf_FILENAME
     else
         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 检测到直播结束但是没有检测到任何的录播文件。\n"
         `echo -e "【Warning】\n检测到直播结束但是没有检测到任何的录播文件，请求人工介入。" | mail -s "Warning::文件疑似缺失警报" orikiringi@gmail.com`
