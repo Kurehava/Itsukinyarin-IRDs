@@ -41,6 +41,7 @@ function ProgressBar(){
                 printf "\n\e[1;40;31m[erro]\e[0;0;96m : 目标文件不为文件夹也不为文件，很奇怪，我无法开启进度条显示。\n"
                 break 2
             fi
+            sleep 1s
             let statsize=$targsize*100/$metasize
             let chkdatas=$i+5
             let index=i%4
