@@ -124,7 +124,8 @@ function occupychk(){
         mkdir -p $savepath
     
         #DDTV
-        DDTV_DL_DIR="$DDTV_DIR/bilibili_$unames"_"$list/";cd $DDTV_DL_DIR
+        #DDTV_DL_DIR="$DDTV_DIR/bilibili_$unames"_"$list/";cd $DDTV_DL_DIR
+        DDTV_DL_DIR="$DDTV_DIR/""$list"_"$unames""_bilibili";cd $DDTV_DL_DIR
         DDTV_DL_DIR_LEN=${#DDTV_DL_DIR}
         for DDTV_FLV in *.flv;do
             if [ "$DDTV_FLV" = "*.flv" ];then
