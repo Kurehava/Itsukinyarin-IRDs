@@ -292,17 +292,19 @@ function occupychk(){
                 while :;do
                     if [[ "`lsof "$DDTV_FLV" 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ]] && [ "$SLEEPWAIT" -le "2" ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
-                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
+                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n" >> /home/$USER/.IRDs.log
                         sleep 10m
                         let SLEEPWAIT++
                     elif [ "$SLEEPWAIT" -gt "2" ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n"
+                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n" >> /home/$USER/.IRDs.log
                         ddtvwaitlist+=("$DDTV_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/$DDTV_FLV")
                         break
                     else
                         NameConvert "$DDTV_DL_DIR" "$DDTV_FLV" "1" "1"
                         DDTV_FLV="$FLVw"
                         printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV-正在移动文件"$DDTV_FLV".\n"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV-正在移动文件"$DDTV_FLV".\n" >> /home/$USER/.IRDs.log
                         metasize="`ls -l "$DDTV_FLV" | awk '{print $5}' 2>/dev/null`"
                         mv "$DDTV_FLV" "$savepath"&
                         ProgressBar "$savepath" "$DDTV_FLV" "$metasize"
@@ -326,16 +328,19 @@ function occupychk(){
                 while :;do
                     if [ "`lsof "$BILI_FLV" 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ] && [ "$SLEEPWAIT" \<\= "2"  ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
+                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n" >> /home/$USER/.IRDs.log
                         sleep 10m
                         let SLEEPWAIT++
                     elif [ "$SLEEPWAIT" \> "2" ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n"
+                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n" >> /home/$USER/.IRDs.log
                         biliwaitlist+=("$BILI_DL_DIR$BILI_FOLDER")
                         break
                     else
                         NameConvert "$BILI_DL_DIR$BILI_FOLDER" "$BILI_FLV" "1" "1"
                         BILI_FLV="$FLVw"
-                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FLV".\n"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FOLDER".\n"
+                        printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FOLDER".\n" >> /home/$USER/.IRDs.log
                         metasize="`du --max-depth=1 "$BILI_DL_DIR$BILI_FOLDER" | awk '{print $1}' 2>/dev/null`"
                         mv "$BILI_DL_DIR$BILI_FOLDER" "$savepath"&
                         ProgressBar "$savepath" "$BILI_FOLDER" "$metasize"
@@ -346,6 +351,7 @@ function occupychk(){
         done
         if [ $flag2bili = 0 ];then
             printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : 录播姬目录没有检测到FLV录制视频文件\n"
+            printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : 录播姬目录没有检测到FLV录制视频文件\n" >> /home/$USER/.IRDs.log
         fi
         unset SLEEPWAIT BILI_FOLDER BILI_FLV flag2bili metasize BILI_DL_DIR
 
@@ -359,6 +365,7 @@ function occupychk(){
                     NameConvert "$dwf_DIR" "$dwf_FILENAME" "1" "1"
                     dwf_FILENAME="$FLVw"
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV池-正在移动文件池文件"$dwf_FILENAME"\n"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV池-正在移动文件池文件"$dwf_FILENAME"\n" >> /home/$USER/.IRDs.log
                     metasize="`ls -l "$dwf_FILENAME" | awk '{print $5}' 2>/dev/null`"
                     mv "$dwf_FILENAME" "$savepath"&
                     ProgressBar "$savepath" "$dwf_FILENAME" "$metasize"
@@ -368,6 +375,7 @@ function occupychk(){
                     PROCESS_NAME=`ps -ef | grep -w $PIDw | awk '{print $8,$9,$10}'`
                     `echo -e "【Warning】\n出现长时间文件被占用的情况，请求人工介入：\n被占用文件路径 : $dwf\n占用程序PID   : $PID\n占用程序名称   : $PROCESS_NAME" | mail -s "Warning::文件占用警报" orikiringi@gmail.com`
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : "$dwf"出现长时间文件占用现象，已邮件通知管理者。\n"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : "$dwf"出现长时间文件占用现象，已邮件通知管理者。\n" >> /home/$USER/.IRDs.log
                 fi
             done
         fi
@@ -391,6 +399,7 @@ function occupychk(){
                     bwf_FILENAME="$FLVw"
                     bwf="$bwf_DIR$bwf_FILENAME"
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI池-正在移动文件池文件"$bwf_FILENAME"\n"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI池-正在移动文件池文件"$bwf_FILENAME"\n" >> /home/$USER/.IRDs.log
                     metasize=`du --max-depth=1 "$bwf" | awk '{print $1}' 2>/dev/null`
                     mv "$bwf" "$savepath"&
                     ProgressBar "$savepath" "$bwf_FILENAME" "$metasize"
@@ -399,21 +408,25 @@ function occupychk(){
                     PROCESS_NAME=`ps -ef | grep -w $PIDw | awk '{print $8,$9,$10}'`
                     `echo -e "【Warning】\n出现长时间文件被占用的情况，请求人工介入：\n被占用文件路径 : $bwf\n占用程序PID   : $PID\n占用程序名称   : $PROCESS_NAME" | mail -s "Warning::文件占用警报" orikiringi@gmail.com`
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : "$bwf"出现长时间文件占用现象，已邮件通知管理者。\n"
+                    printf "\n\e[1;40;32m[info]\e[0;0;96m : "$bwf"出现长时间文件占用现象，已邮件通知管理者。\n" >> /home/$USER/.IRDs.log
                 fi
             done
         fi
         unset bwf totalflv metasize biliwaitlist PIDw PROCESS_NAME bwf_DIR bwf_FILENAME
     else
         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 检测到直播结束但是没有检测到任何的录播文件。\n"
+        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 检测到直播结束但是没有检测到任何的录播文件。\n" >> /home/$USER/.IRDs.log
         `echo -e "【Warning】\n检测到直播结束但是没有检测到任何的录播文件，请求人工介入。" | mail -s "Warning::文件疑似缺失警报" orikiringi@gmail.com`
     fi
     printf "\n\e[1;40;32m[info]\e[0;0;96m : 文件移动阶段结束，返回直播间监视。\n"
+    printf "\n\e[1;40;32m[info]\e[0;0;96m : 文件移动阶段结束，返回直播间监视。\n" >> /home/$USER/.IRDs.log
 }
 
 #代码实际执行区
 if [ ! -f "/home/$USER/.IRDsCache.log" ];then
     touch /home/$USER/.IRDsCache.log
 fi
+header
 #fakeinfosys&
 infosys&
 while :;do
