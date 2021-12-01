@@ -9,8 +9,8 @@ clear
 #=============Meta Root==============================
 BILI_DIR="/home/oriki/recordserver/BiliRecorder/"
 DDTV_DIR="/home/oriki/recordserver/DDTV2/tmp"
-#RECORD_DIR="/media/oriki/GravityWall"
-RECORD_DIR="/home/oriki/wqe"
+RECORD_DIR="/media/oriki/GravityWall"
+#RECORD_DIR="/home/oriki/wqe"
 
 function header(){
     #从第5行到屏幕底端的范围滚动显示
@@ -25,7 +25,10 @@ function header(){
 function NameConvert(){
     cd "$1"
     FLVw=`echo "$2" | sed 's:\\\::g' | tr -d " ><*+/'#$\""`
-    if [ $3 = 1 ];then
+    if [ "$4" = "2" ];then
+        FLVw="$FLVw/"
+    fi
+    if [ "$3" = "1" ] && [ "$2" != "$FLVw" ];then
         mv "$2" "$FLVw"
     fi
 }
@@ -203,7 +206,7 @@ function infosys(){
             if [ "${#LIVING_DOWNLV[@]}" != "0" ];then
                 for count in `seq 0 $((${#DOWNLV_STAMPU[@]}-1))`;do
                     #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为0
-                    if [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" = "30" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "0" ];then
+                    if [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" -ge "5" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "0" ];then
                         for countro in `seq 0 $((${#LIVING_ROMNUM[@]}-1))`;do
                             #如果${LIVING_ROMNUM[$countro]}(开播列表)读到的房间号等于${LIVING_DOWNLV[$count]}(下播等待列表) and ${#LIVING_ROMNUM[@]}(开播列表总长)等于引导数+1
                             if [ "${LIVING_ROMNUM[$countro]}" = "${LIVING_DOWNLV[$count]}" ] && [ ${#LIVING_ROMNUM[@]} = $((countro+1)) ];then
@@ -255,7 +258,7 @@ function infosys(){
                             fi
                         done
                     #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为1
-                    elif [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" = "30" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "1" ];then
+                    elif [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" -ge "5" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "1" ];then
                         RELIVE=1
                     fi
                 done
@@ -269,11 +272,11 @@ function infosys(){
 function occupychk(){
     SLEEPWAIT=0;ddtvwaitlist=[];biliwaitlist=[];
     #if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/bilibili_$unames"_"$list/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
-    if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
+    if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
         if [ $(date "+%H") \< "06" ];then
-            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m")-`expr $(date "+%d") - 1`/$(date "+%m")-`expr $(date "+%d") - 1`-DayChangeConvert/"
+            savepath="$RECORD_DIR/$(date "+%Y")/${FILEDP_UNAMES[$count2FR]}/$(date "+%Y-%m")-`expr $(date "+%d") - 1`/$(date "+%m")-`expr $(date "+%d") - 1`-DayChangeConvert/"
         else
-            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m-%d")/${FILEDP_TSTAMP[$count2FR]}/"
+            savepath="$RECORD_DIR/$(date "+%Y")/${FILEDP_UNAMES[$count2FR]}/$(date "+%Y-%m-%d")/${FILEDP_TSTAMP[$count2FR]}/"
         fi
         mkdir -p $savepath
     
@@ -284,6 +287,7 @@ function occupychk(){
             if [ "$DDTV_FLV" = "*.flv" ];then
                 printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : DDTV目录没有检测到FLV录制视频文件\n"
                 printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : DDTV目录没有检测到FLV录制视频文件\n" >> /home/$USER/.IRDs.log
+                break
             else
                 while :;do
                     if [[ "`lsof "$DDTV_FLV" 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ]] && [ "$SLEEPWAIT" -le "2" ];then
@@ -296,7 +300,7 @@ function occupychk(){
                         ddtvwaitlist+=("$DDTV_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/$DDTV_FLV")
                         break
                     else
-                        NameConvert "$DDTV_DL_DIR" "$DDTV_FLV" "1"
+                        NameConvert "$DDTV_DL_DIR" "$DDTV_FLV" "1" "1"
                         DDTV_FLV="$FLVw"
                         printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV-正在移动文件"$DDTV_FLV".\n"
                         metasize="`ls -l "$DDTV_FLV" | awk '{print $5}' 2>/dev/null`"
@@ -307,15 +311,16 @@ function occupychk(){
                 done
             fi
         done
-        unset SLEEPWAIT DDTV_FLV metasize
+        unset SLEEPWAIT DDTV_FLV metasize DDTV_DL_DIR DDTV_DL_DIR_LEN
 
         #BilibiliRecord
-        cd "$BILI_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/"
+        BILI_DL_DIR="$BILI_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/"
+        cd $BILI_DL_DIR
         flag2bili=0
         for BILI_FOLDER in `ls -d */ | grep "^$(date "+%Y")"`;do
-            NameConvert "$BILI_DIR" "$BILI_FOLDER" "1"
+            NameConvert "$BILI_DL_DIR" "$BILI_FOLDER" "1" "2"
             BILI_FOLDER="$FLVw"
-            cd "$BILI_DIR$BILI_FOLDER"
+            cd "$BILI_DL_DIR$BILI_FOLDER"
             flag2bili=1
             for BILI_FLV in *.flv;do
                 while :;do
@@ -325,14 +330,14 @@ function occupychk(){
                         let SLEEPWAIT++
                     elif [ "$SLEEPWAIT" \> "2" ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n"
-                        biliwaitlist+=("$BILI_DIR$BILI_FOLDER")
+                        biliwaitlist+=("$BILI_DL_DIR$BILI_FOLDER")
                         break
                     else
-                        NameConvert "$BILI_DIR$BILI_FOLDER" "$BILI_FLV" "1"
+                        NameConvert "$BILI_DL_DIR$BILI_FOLDER" "$BILI_FLV" "1" "1"
                         BILI_FLV="$FLVw"
                         printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI-正在移动文件"$BILI_FLV".\n"
-                        metasize="`du --max-depth=1 "$BILI_DIR$BILI_FOLDER" | awk '{print $1}' 2>/dev/null`"
-                        mv "$BILI_DIR$BILI_FOLDER" "$savepath"&
+                        metasize="`du --max-depth=1 "$BILI_DL_DIR$BILI_FOLDER" | awk '{print $1}' 2>/dev/null`"
+                        mv "$BILI_DL_DIR$BILI_FOLDER" "$savepath"&
                         ProgressBar "$savepath" "$BILI_FOLDER" "$metasize"
                         break
                     fi
@@ -342,7 +347,7 @@ function occupychk(){
         if [ $flag2bili = 0 ];then
             printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : 录播姬目录没有检测到FLV录制视频文件\n"
         fi
-        unset SLEEPWAIT BILI_FOLDER BILI_FLV flag2bili metasize
+        unset SLEEPWAIT BILI_FOLDER BILI_FLV flag2bili metasize BILI_DL_DIR
 
         #DDTV等待文件池
         if [ "${#ddtvwaitlist[*]}" \> "1" ];then
@@ -351,7 +356,7 @@ function occupychk(){
                 if [ "$PID" = "" ];then
                     dwf_DIR=${dwf:0:$DDTV_DL_DIR_LEN}
                     dwf_FILENAME=${dwf:$DDTV_DL_DIR_LEN}
-                    NameConvert "$dwf_DIR" "$dwf_FILENAME" "1"
+                    NameConvert "$dwf_DIR" "$dwf_FILENAME" "1" "1"
                     dwf_FILENAME="$FLVw"
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : DDTV池-正在移动文件池文件"$dwf_FILENAME"\n"
                     metasize="`ls -l "$dwf_FILENAME" | awk '{print $5}' 2>/dev/null`"
@@ -382,7 +387,7 @@ function occupychk(){
                 if [ "$totalflv" = "0" ];then
                     bwf_DIR=${dwf:0:38}
                     bwf_FILENAME=${dwf:38}
-                    NameConvert "$bwf_DIR" "$bwf_FILENAME" "1"
+                    NameConvert "$bwf_DIR" "$bwf_FILENAME" "1" "2"
                     bwf_FILENAME="$FLVw"
                     bwf="$bwf_DIR$bwf_FILENAME"
                     printf "\n\e[1;40;32m[info]\e[0;0;96m : BILI池-正在移动文件池文件"$bwf_FILENAME"\n"
@@ -409,7 +414,8 @@ function occupychk(){
 if [ ! -f "/home/$USER/.IRDsCache.log" ];then
     touch /home/$USER/.IRDsCache.log
 fi
-fakeinfosys&
+#fakeinfosys&
+infosys&
 while :;do
     if [ "`cat /home/$USER/.IRDsCache.log`" != "" ];then
         count=0
@@ -423,16 +429,13 @@ while :;do
         FILEDP_ROMNUM=(`echo $rooms | sed 's:\ :,:g' | tr ',' ' '`)
         FILEDP_UNAMES=(`echo $names | sed 's:\ :,:g' | tr ',' ' '`)
         FILEDP_TSTAMP=(`echo $stamp | sed 's:\ :,:g' | tr ',' ' '`)
-        echo ${FILEDP_ROMNUM[@]}
-        echo ${FILEDP_UNAMES[@]}
-        echo ${FILEDP_TSTAMP[@]}
         unset rooms names stamp
         >/home/$USER/.IRDsCache.log
-    fi
-    if [ "${#FILEDP_ROMNUM[@]}" != "0" ];then
-        for count2FR in `seq 0 $((${#FILEDP_ROMNUM[@]}-1))`;do
-            occupychk
-        done
+        if [ "${#FILEDP_ROMNUM[@]}" != "0" ];then
+            for count2FR in `seq 0 $((${#FILEDP_ROMNUM[@]}-1))`;do
+                occupychk
+            done
+        fi
     fi
     sleep 5s
 done
