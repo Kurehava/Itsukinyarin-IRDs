@@ -1,11 +1,17 @@
-clear;liveflags=0;secflags=0;clfeflags=0;
+roomlist=("3858888" "135001")
+LIVING_ROMNUM=();LIVING_STATUS=();LIVING_TARUID=();LIVING_TITLES=();LIVING_UNAMES=();LIVING_TSTAMP=();LIVING_DOWNLV=();
+FILEDP_ROMNUM=();FILEDP_UNAMES=();FILEDP_TSTAMP=();RELIVE=0;liveflags=0;secflags=0;clfeflags=0;
+clear
+#=============Meta Root==============================
 #BILI_DIR="/home/nyarin/recordserver/BiliRecorder/"
 #DDTV_DIR="/home/nyarin/recordserver/DDTV2/tmp"
 #RECORD_DIR="/media/nyarin/Record-DISK/RecordFiles"
+#=============Meta Root==============================
 BILI_DIR="/home/oriki/recordserver/BiliRecorder/"
 DDTV_DIR="/home/oriki/recordserver/DDTV2/tmp"
-RECORD_DIR="/media/oriki/GravityWall"
-#RECORD_DIR="/home/oriki/wqe"
+#RECORD_DIR="/media/oriki/GravityWall"
+RECORD_DIR="/home/oriki/wqe"
+
 function header(){
     #从第5行到屏幕底端的范围滚动显示
     echo -ne "\e[5r"
@@ -58,87 +64,236 @@ function ProgressBar(){
     fi
 }
 
-function statuschk(){
-    if [ "$1" = "" ];then
-        #0为未开播 1为直播中 2为轮播中
-        roomlist=("3858888" "135001")
-        if [ "$liveflags" = "0" ];then
-            for list in ${roomlist[@]};do
-                status="$(echo `curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=$list"` | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}')"
-                taruid="$(echo `curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=$list"` | sed 's:,: :g' | awk '{print $6}' | sed 's/:/ /g' | awk '{print $2}')"
-                titles="$(curl -s https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids -H "Content-Type: application/json" -d "{\"uids\": [$taruid]}" | sed 's:,:\n:g' | sed 's:{::g' | grep "title" | sed 's/:/ /g' | awk '{print $4}' | sed 's:"::g')"
-                unames="$(curl -s https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids -H "Content-Type: application/json" -d "{\"uids\": [$taruid]}" | sed 's:,:\n:g' | sed 's:{::g' | grep "uname" | sed 's/:/ /g' | awk '{print $2}' | sed 's:"::g')"
-                if [ "$status" = "1" ];then
-                    liveflags=1;break
-                fi
-            done
-        elif [ "$liveflags" = "1" ];then
-            status="$(echo `curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=$list"` | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}')"
-            if [ "$status" = "0" ];then
-                liveflags=2
+function fakeinfosys(){
+    while :;do
+        list="`cat test.log | awk '{print $1}'`"
+        STATUS="`cat test.log | awk '{print $2}'`"
+        TARUID="123456"
+        TITLES="AAAA"
+        UNAMES="`cat test.log | awk '{print $3}'`"
+        #echo status::$STATUS
+        #开播状态为1 and 房间号不在开播列表
+        if [ "$STATUS" = "1" ] && [[ ! ${LIVING_ROMNUM[@]} =~ $list ]];then
+            #开播房间号列表
+            LIVING_ROMNUM+=("$list")
+            #开播状态列表
+            LIVING_STATUS+=("$STATUS")
+            #开播用户ID列表(非房间号，为主播UID)
+            LIVING_TARUID+=("$TARUID")
+            #开播标题
+            LIVING_TITLES+=("\"$TITLES\"")
+            #开播用户名
+            LIVING_UNAMES+=("$UNAMES")
+            #开播时间戳
+            LIVING_TSTAMP+=("$(date "+%m-%d-%H-%M")")
+            if [ $RELIVE = 0 ];then
+                printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$UNAMES" 已开播\n\e[1;40;32m[info]\e[0;0;96m : $TITLES\n\n"
+            else
+                printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$UNAMES" 已复播\n\e[1;40;32m[info]\e[0;0;96m : $TITLES\n\n"
+                RELIVE=0
             fi
         fi
-    fi
+        #开播状态为0 and 房间号在开播列表 and 房间号不在下播等待列表
+        if [ "$STATUS" = "0" ] && [[ ${LIVING_ROMNUM[@]} =~ $list ]] && [[ ! ${LIVING_DOWNLV[@]} =~ $list ]];then
+            printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : 检测到[ $list-$UNAMES ]已经下播\n\e[1;40;32m[info]\e[0;0;96m : 触发安全休眠系统，安全休眠10分钟后自动唤醒。\n\n"
+            LIVING_DOWNLV+=("$list")
+            DOWNLV_STAMPU+=("$(date +%s)")
+        fi
+        #下播等待列表不为空
+        if [ "${#LIVING_DOWNLV[@]}" != "0" ];then
+            for count in `seq 0 $((${#DOWNLV_STAMPU[@]}-1))`;do
+                #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为0
+                if [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" -ge "5" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "0" ];then
+                    for countro in `seq 0 $((${#LIVING_ROMNUM[@]}-1))`;do
+                        #如果${LIVING_ROMNUM[$countro]}(开播列表)读到的房间号等于${LIVING_DOWNLV[$count]}(下播等待列表) and ${#LIVING_ROMNUM[@]}(开播列表总长)等于引导数+1
+                        if [ "${LIVING_ROMNUM[$countro]}" = "${LIVING_DOWNLV[$count]}" ] && [ ${#LIVING_ROMNUM[@]} = $((countro+1)) ];then
+                            printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_ROMNUM[$countro]}"-"${LIVING_UNAMES[$countro]}" 已下播\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_TITLES[$countro]}"\n\n"
+                            #待转移录播数据房间号列表
+                            FILEDP_ROMNUM+=("${LIVING_ROMNUM[$countro]}")
+                            LIVING_ROMNUM=("${LIVING_ROMNUM[@]:0:$countro}")
+                            LIVING_STATUS=("${LIVING_STATUS[@]:0:$countro}")
+                            LIVING_TARUID=("${LIVING_TARUID[@]:0:$countro}")
+                            LIVING_TITLES=("${LIVING_TITLES[@]:0:$countro}")
+                            #待转移录播数据开播用户名
+                            FILEDP_UNAMES+=("${LIVING_UNAMES[$countro]}")
+                            LIVING_UNAMES=("${LIVING_UNAMES[@]:0:$countro}")
+                            #待转移录播数据开播时间戳
+                            FILEDP_TSTAMP+=("${LIVING_TSTAMP[$countro]}")
+                            LIVING_TSTAMP=("${LIVING_TSTAMP[@]:0:$countro}")
+                            >/home/$USER/.IRDsCache.log
+                            echo ${FILEDP_ROMNUM[@]} >> /home/$USER/.IRDsCache.log
+                            echo ${FILEDP_UNAMES[@]} >> /home/$USER/.IRDsCache.log
+                            echo ${FILEDP_TSTAMP[@]} >> /home/$USER/.IRDsCache.log
+                        #如果${LIVING_ROMNUM[$countro]}(开播列表)读到的房间号等于${LIVING_DOWNLV[$count]}(下播等待列表) and ${#LIVING_ROMNUM[@]}(开播列表总长)不等于引导数+1
+                        elif [ "${LIVING_ROMNUM[$countro]}" = "${LIVING_DOWNLV[$count]}" ] && [ ${#LIVING_ROMNUM[@]} != $((countro+1)) ];then
+                            printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_ROMNUM[$countro]}"-"${LIVING_UNAMES[$countro]}" 已下播\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_TITLES[$countro]}"\n\n"
+                            #待转移录播数据房间号列表
+                            FILEDP_ROMNUM+=("${LIVING_ROMNUM[$countro]}")
+                            LIVING_ROMNUM=("${LIVING_ROMNUM[@]:0:$countro}" "${LIVING_ROMNUM[@]:$((countro+1))}")
+                            LIVING_STATUS=("${LIVING_STATUS[@]:0:$countro}" "${LIVING_STATUS[@]:$((countro+1))}")
+                            LIVING_TARUID=("${LIVING_TARUID[@]:0:$countro}" "${LIVING_TARUID[@]:$((countro+1))}")
+                            LIVING_TITLES=("${LIVING_TITLES[@]:0:$countro}" "${LIVING_TITLES[@]:$((countro+1))}")
+                            #待转移录播数据开播用户名
+                            FILEDP_UNAMES+=("${LIVING_UNAMES[$countro]}")
+                            LIVING_UNAMES=("${LIVING_UNAMES[@]:0:$countro}" "${LIVING_UNAMES[@]:$((countro+1))}")
+                            #待转移录播数据开播时间戳
+                            FILEDP_TSTAMP+=("${LIVING_TSTAMP[$countro]}")
+                            LIVING_TSTAMP=("${LIVING_TSTAMP[@]:0:$countro}" "${LIVING_TSTAMP[@]:$((countro+1))}")
+                            >/home/$USER/.IRDsCache.log
+                            echo ${FILEDP_ROMNUM[@]} >> /home/$USER/.IRDsCache.log
+                            echo ${FILEDP_UNAMES[@]} >> /home/$USER/.IRDsCache.log
+                            echo ${FILEDP_TSTAMP[@]} >> /home/$USER/.IRDsCache.log
+                        fi
+                    done
+                    for countdo in `seq 0 $((${#LIVING_DOWNLV[@]}-1))`;do
+                        if [[ "${FILEDP_ROMNUM[@]}" =~ "${LIVING_DOWNLV[$countdo]}" ]] && [ ${#LIVING_DOWNLV[@]} = $((countdo+1)) ];then
+                            LIVING_DOWNLV=("${LIVING_DOWNLV[@]:0:$countdo}")
+                            DOWNLV_STAMPU=("${DOWNLV_STAMPU[@]:0:$countdo}")
+                        elif [[ "${FILEDP_ROMNUM[@]}" =~ "${LIVING_DOWNLV[$countdo]}" ]] && [ ${#LIVING_ROMNUM[@]} != $((countdo+1)) ];then
+                            LIVING_DOWNLV=("${LIVING_DOWNLV[@]:0:$countdo}" "${LIVING_DOWNLV[@]:$((countdo+1))}")
+                            DOWNLV_STAMPU=("${LIVING_DOWNLV[@]:0:$countdo}" "${LIVING_DOWNLV[@]:$((countdo+1))}")
+                        fi
+                    done
+                #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为1
+                elif [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" -ge "5" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "1" ];then
+                    RELIVE=1
+                fi
+            done
+        fi
+        unset count countro countdo
+        sleep 1s
+    done
 }
 
 function infosys(){
     while :;do
-        statuschk
-        if [ "$clfeflags" = "0" ] && [ "$status" = "1" ];then
-            case $liveflags in
-                #\e[93m"$(date "+%Y-%m-%d %H:%M:%S")"\e[96m
-                1) printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$unames" 已开播\n\e[1;40;32m[info]\e[0;0;96m : $titles\n";thifloder=$(date "+%m-%d-%H-%M");;
-                0) printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$unames" 已下播\n\e[1;40;32m[info]\e[0;0;96m : $titles\n";secflags=1;;
-                *) printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : statuschk 返回值不为[1]开播，[2]下播的、任意一个。\n";;
-            esac
-            clfeflags=1
-        fi
-        sleep 2s
-        if [ "$secflags" = "1" ];then
-            printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : 检测到[ $list-$unames ]已经下播，触发安全休眠系统，安全休眠10分钟后自动唤醒。\n"
-            sleep 10m;statuschk;liveflags=0;secflags=0;clfeflags=0;
-            if [ "$status" = "0" ];then
-                break;
-            else
-                printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : 检测到[ $list-$unames ]复播，进入循环检测系统。\n"
+        for list in ${roomlist[@]};do
+            STATUS="$(echo `curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=$list"` | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}')"
+            TARUID="$(echo `curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=$list"` | sed 's:,: :g' | awk '{print $6}' | sed 's/:/ /g' | awk '{print $2}')"
+            TITLES="$(curl -s https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids -H "Content-Type: application/json" -d "{\"uids\": [$TARUID]}" | sed 's:,:\n:g' | sed 's:{::g' | grep "title" | sed 's/:/ /g' | awk '{print $4}' | sed 's:"::g')"
+            UNAMES="$(curl -s https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids -H "Content-Type: application/json" -d "{\"uids\": [$TARUID]}" | sed 's:,:\n:g' | sed 's:{::g' | grep "uname" | sed 's/:/ /g' | awk '{print $2}' | sed 's:"::g')"
+            #开播状态为1 and 房间号不在开播列表
+            if [ "$STATUS" = "1" ] && [[ ! ${LIVING_ROMNUM[@]} =~ $list ]];then
+                #开播房间号列表
+                LIVING_ROMNUM+=("$list")
+                #开播状态列表
+                LIVING_STATUS+=("$STATUS")
+                #开播用户ID列表(非房间号，为主播UID)
+                LIVING_TARUID+=("$TARUID")
+                #开播标题
+                LIVING_TITLES+=("\"$TITLES\"")
+                #开播用户名
+                LIVING_UNAMES+=("$UNAMES")
+                #开播时间戳
+                LIVING_TSTAMP+=("$(date "+%m-%d-%H-%M")")
+                if [ $RELIVE = 0 ];then
+                    printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$UNAMES" 已开播\n\e[1;40;32m[info]\e[0;0;96m : $TITLES\n\n"
+                else
+                    printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "$list"-"$UNAMES" 已复播\n\e[1;40;32m[info]\e[0;0;96m : $TITLES\n\n"
+                    RELIVE=0
+                fi
             fi
-        fi
+            #开播状态为0 and 房间号在开播列表 and 房间号不在下播等待列表
+            if [ "$STATUS" = "0" ] && [[ ${LIVING_ROMNUM[@]} =~ $list ]] && [[ ! ${LIVING_DOWNLV[@]} =~ $list ]];then
+                printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : 检测到[ $list-$UNAMES ]已经下播\n\e[1;40;32m[info]\e[0;0;96m : 触发安全休眠系统，安全休眠10分钟后自动唤醒。\n\n"
+                LIVING_DOWNLV+=("$list")
+                DOWNLV_STAMPU+=("$(date +%s)")
+            fi
+            #下播等待列表不为空
+            if [ "${#LIVING_DOWNLV[@]}" != "0" ];then
+                for count in `seq 0 $((${#DOWNLV_STAMPU[@]}-1))`;do
+                    #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为0
+                    if [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" = "30" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "0" ];then
+                        for countro in `seq 0 $((${#LIVING_ROMNUM[@]}-1))`;do
+                            #如果${LIVING_ROMNUM[$countro]}(开播列表)读到的房间号等于${LIVING_DOWNLV[$count]}(下播等待列表) and ${#LIVING_ROMNUM[@]}(开播列表总长)等于引导数+1
+                            if [ "${LIVING_ROMNUM[$countro]}" = "${LIVING_DOWNLV[$count]}" ] && [ ${#LIVING_ROMNUM[@]} = $((countro+1)) ];then
+                                printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_ROMNUM[$countro]}"-"${LIVING_UNAMES[$countro]}" 已下播\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_TITLES[$countro]}"\n\n"
+                                #待转移录播数据房间号列表
+                                FILEDP_ROMNUM+=("${LIVING_ROMNUM[$countro]}")
+                                LIVING_ROMNUM=("${LIVING_ROMNUM[@]:0:$countro}")
+                                LIVING_STATUS=("${LIVING_STATUS[@]:0:$countro}")
+                                LIVING_TARUID=("${LIVING_TARUID[@]:0:$countro}")
+                                LIVING_TITLES=("${LIVING_TITLES[@]:0:$countro}")
+                                #待转移录播数据开播用户名
+                                FILEDP_UNAMES+=("${LIVING_UNAMES[$countro]}")
+                                LIVING_UNAMES=("${LIVING_UNAMES[@]:0:$countro}")
+                                #待转移录播数据开播时间戳
+                                FILEDP_TSTAMP+=("${LIVING_TSTAMP[$countro]}")
+                                LIVING_TSTAMP=("${LIVING_TSTAMP[@]:0:$countro}")
+                                >/home/$USER/.IRDsCache.log
+                                echo ${FILEDP_ROMNUM[@]} >> /home/$USER/.IRDsCache.log
+                                echo ${FILEDP_UNAMES[@]} >> /home/$USER/.IRDsCache.log
+                                echo ${FILEDP_TSTAMP[@]} >> /home/$USER/.IRDsCache.log
+                            #如果${LIVING_ROMNUM[$countro]}(开播列表)读到的房间号等于${LIVING_DOWNLV[$count]}(下播等待列表) and ${#LIVING_ROMNUM[@]}(开播列表总长)不等于引导数+1
+                            elif [ "${LIVING_ROMNUM[$countro]}" = "${LIVING_DOWNLV[$count]}" ] && [ ${#LIVING_ROMNUM[@]} != $((countro+1)) ];then
+                                printf "\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_ROMNUM[$countro]}"-"${LIVING_UNAMES[$countro]}" 已下播\n\e[1;40;32m[info]\e[0;0;96m : "${LIVING_TITLES[$countro]}"\n\n"
+                                #待转移录播数据房间号列表
+                                FILEDP_ROMNUM+=("${LIVING_ROMNUM[$countro]}")
+                                LIVING_ROMNUM=("${LIVING_ROMNUM[@]:0:$countro}" "${LIVING_ROMNUM[@]:$((countro+1))}")
+                                LIVING_STATUS=("${LIVING_STATUS[@]:0:$countro}" "${LIVING_STATUS[@]:$((countro+1))}")
+                                LIVING_TARUID=("${LIVING_TARUID[@]:0:$countro}" "${LIVING_TARUID[@]:$((countro+1))}")
+                                LIVING_TITLES=("${LIVING_TITLES[@]:0:$countro}" "${LIVING_TITLES[@]:$((countro+1))}")
+                                #待转移录播数据开播用户名
+                                FILEDP_UNAMES+=("${LIVING_UNAMES[$countro]}")
+                                LIVING_UNAMES=("${LIVING_UNAMES[@]:0:$countro}" "${LIVING_UNAMES[@]:$((countro+1))}")
+                                #待转移录播数据开播时间戳
+                                FILEDP_TSTAMP+=("${LIVING_TSTAMP[$countro]}")
+                                LIVING_TSTAMP=("${LIVING_TSTAMP[@]:0:$countro}" "${LIVING_TSTAMP[@]:$((countro+1))}")
+                                >/home/$USER/.IRDsCache.log
+                                echo ${FILEDP_ROMNUM[@]} >> /home/$USER/.IRDsCache.log
+                                echo ${FILEDP_UNAMES[@]} >> /home/$USER/.IRDsCache.log
+                                echo ${FILEDP_TSTAMP[@]} >> /home/$USER/.IRDsCache.log
+                            fi
+                        done
+                        for countdo in `seq 0 $((${#LIVING_DOWNLV[@]}-1))`;do
+                            if [[ "${FILEDP_ROMNUM[@]}" =~ "${LIVING_DOWNLV[$countdo]}" ]] && [ ${#LIVING_DOWNLV[@]} = $((countdo+1)) ];then
+                                LIVING_DOWNLV=("${LIVING_DOWNLV[@]:0:$countdo}")
+                                DOWNLV_STAMPU=("${DOWNLV_STAMPU[@]:0:$countdo}")
+                            elif [[ "${FILEDP_ROMNUM[@]}" =~ "${LIVING_DOWNLV[$countdo]}" ]] && [ ${#LIVING_ROMNUM[@]} != $((countdo+1)) ];then
+                                LIVING_DOWNLV=("${LIVING_DOWNLV[@]:0:$countdo}" "${LIVING_DOWNLV[@]:$((countdo+1))}")
+                                DOWNLV_STAMPU=("${LIVING_DOWNLV[@]:0:$countdo}" "${LIVING_DOWNLV[@]:$((countdo+1))}")
+                            fi
+                        done
+                    #现在的UNIX时间戳与列表中保存的时间戳相减等于600 and 指定房间号的开播状态为1
+                    elif [ "`expr $(date +%s) - ${DOWNLV_STAMPU[$count]}`" = "30" ] && [ "`curl -s "http://api.live.bilibili.com/room/v1/Room/room_init?id=${LIVING_DOWNLV[$count]}" | sed 's:,: :g' | awk '{print $11}' | sed 's/:/ /g' | awk '{print $2}'`" = "1" ];then
+                        RELIVE=1
+                    fi
+                done
+            fi
+            unset count countro countdo
+        done
+        sleep 1s
     done
-    printf "-------------------------------------------\n"
-}
-
-function testarea(){
-    thifloder=$(date "+%m-%d-%H-%M")
-    unames="伊月猫凛"
-    list="3858888"
 }
 
 function occupychk(){
     SLEEPWAIT=0;ddtvwaitlist=[];biliwaitlist=[];
-    if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/bilibili_$unames"_"$list/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
+    #if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/bilibili_$unames"_"$list/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
+    if [ "`ls -l "/home/oriki/recordserver/DDTV2/tmp/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/" | grep .flv | grep "^-" | wc -l`" \> "0" ] || [ "`cd /home/oriki/recordserver/BiliRecorder/ && ls -d */ | grep "^$(date "+%Y")" | wc -l`" \> "0" ];then
         if [ $(date "+%H") \< "06" ];then
-            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m")-`expr $(date "+%d") - 1`/$(date "+%m")-`expr $(date "+%d") - 1`-daychangecover/"
+            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m")-`expr $(date "+%d") - 1`/$(date "+%m")-`expr $(date "+%d") - 1`-DayChangeConvert/"
         else
-            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m-%d")/$thifloder/"
+            savepath="$RECORD_DIR/$(date "+%Y")/$(date "+%Y-%m-%d")/${FILEDP_TSTAMP[$count2FR]}/"
         fi
         mkdir -p $savepath
     
         #DDTV
-        #DDTV_DL_DIR="$DDTV_DIR/bilibili_$unames"_"$list/";cd $DDTV_DL_DIR
-        DDTV_DL_DIR="$DDTV_DIR/""$list"_"$unames""_bilibili";cd $DDTV_DL_DIR
+        DDTV_DL_DIR="$DDTV_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/";cd $DDTV_DL_DIR
         DDTV_DL_DIR_LEN=${#DDTV_DL_DIR}
         for DDTV_FLV in *.flv;do
             if [ "$DDTV_FLV" = "*.flv" ];then
                 printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : DDTV目录没有检测到FLV录制视频文件\n"
+                printf "\n\e[1;40;32m[info]\e[0;0;96m : $(date "+%Y-%m-%d %H:%M:%S")\n\e[1;40;31m[erro]\e[0;0;96m : DDTV目录没有检测到FLV录制视频文件\n" >> /home/$USER/.IRDs.log
             else
                 while :;do
                     if [[ "`lsof "$DDTV_FLV" 2>/dev/null | grep -v "PID" | awk '{print $2}'`" != "" ]] && [ "$SLEEPWAIT" -le "2" ];then
+                        printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件正在占用中，进入10分钟休眠等待中。\n"
                         sleep 10m
                         let SLEEPWAIT++
                     elif [ "$SLEEPWAIT" -gt "2" ];then
                         printf "\n\e[1;40;31m[erro]\e[0;0;96m : 文件占用时间过长，将放入文件池中。\n"
-                        ddtvwaitlist+=("$DDTV_DIR/bilibili_$unames"_"$list/$DDTV_FLV")
+                        ddtvwaitlist+=("$DDTV_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/$DDTV_FLV")
                         break
                     else
                         NameConvert "$DDTV_DL_DIR" "$DDTV_FLV" "1"
@@ -155,7 +310,7 @@ function occupychk(){
         unset SLEEPWAIT DDTV_FLV metasize
 
         #BilibiliRecord
-        cd "$BILI_DIR"
+        cd "$BILI_DIR/${FILEDP_ROMNUM[$count2FR]}"_"${FILEDP_UNAMES[$count2FR]}"_"bilibili/"
         flag2bili=0
         for BILI_FOLDER in `ls -d */ | grep "^$(date "+%Y")"`;do
             NameConvert "$BILI_DIR" "$BILI_FOLDER" "1"
@@ -250,16 +405,34 @@ function occupychk(){
     printf "\n\e[1;40;32m[info]\e[0;0;96m : 文件移动阶段结束，返回直播间监视。\n"
 }
 
-##main##
-#echo "This is the mail body" | mail -s "1234" orikiringi@gmail.com
-#echo -e "This is the mail body\n1234\n1234\n12321321\nqeqw" | mail -s "1234" orikiringi@gmail.com
-#echo "\e[0;90;32m[info]\e[0;0;96m : "${uname[$allcount]}"已开播"
-#echo "\e[0;90;32m[info]\e[0;0;96m : \""${titlelist[$allcount]}"\""
-header
-#show
-#while :;do
-#    infosys
-#    occupychk
-#done
-testarea
-occupychk
+#代码实际执行区
+if [ ! -f "/home/$USER/.IRDsCache.log" ];then
+    touch /home/$USER/.IRDsCache.log
+fi
+fakeinfosys&
+while :;do
+    if [ "`cat /home/$USER/.IRDsCache.log`" != "" ];then
+        count=0
+        while read line;do
+            if [ $count = 0 ];then rooms=$line
+            elif [ $count = 1 ];then names=$line
+            elif [ $count = 2 ];then stamp=$line
+            fi
+            let count++
+        done < /home/$USER/.IRDsCache.log
+        FILEDP_ROMNUM=(`echo $rooms | sed 's:\ :,:g' | tr ',' ' '`)
+        FILEDP_UNAMES=(`echo $names | sed 's:\ :,:g' | tr ',' ' '`)
+        FILEDP_TSTAMP=(`echo $stamp | sed 's:\ :,:g' | tr ',' ' '`)
+        echo ${FILEDP_ROMNUM[@]}
+        echo ${FILEDP_UNAMES[@]}
+        echo ${FILEDP_TSTAMP[@]}
+        unset rooms names stamp
+        >/home/$USER/.IRDsCache.log
+    fi
+    if [ "${#FILEDP_ROMNUM[@]}" != "0" ];then
+        for count2FR in `seq 0 $((${#FILEDP_ROMNUM[@]}-1))`;do
+            occupychk
+        done
+    fi
+    sleep 5s
+done
